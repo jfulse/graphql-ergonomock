@@ -1,6 +1,6 @@
 import React, { ReactElement } from "react";
-import { render, cleanup, screen } from "@testing-library/react";
-import { gql, useQuery } from "@apollo/client";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
+import { gql, useApolloClient, useQuery } from "@apollo/client";
 import schema from "../../__tests__/schema";
 import MockedProvider from "../ErgonoMockedProvider";
 
@@ -266,3 +266,49 @@ test.each([
     expect(__typename).toEqual(expectedValue);
   }
 );
+
+const ComponentWithCacheUpdate = ({ shapeId }: { shapeId: string }): ReactElement => {
+  const { loading, error, data } = useQuery(QUERY_A, { variables: { shapeId } });
+  const { cache } = useApolloClient();
+
+  const onClick = React.useCallback(() => {
+    cache.modify({
+      id: `Shape:${shapeId}`,
+      fields: { returnInt: (current) => current + 1 }
+    })
+  }, [cache, data]);
+
+  if (loading || error) return null;
+
+  return (
+    <div>
+      <p>id: {data.queryShape.id}</p>
+      <p>returnInt: {data.queryShape.returnInt}</p>
+      <button onClick={onClick}>INCREMENT</button>
+    </div>
+  );
+}
+
+test.only('Testname: TODO', async () => {
+  const shapeId = '1';
+  const mocks = {
+    OperationA: {
+      queryShape: {
+        returnInt: 10
+      }
+    }
+  };
+
+  const { findByText } = render(
+    <MockedProvider schema={schema} mocks={mocks}>
+      <ComponentWithCacheUpdate shapeId={shapeId} />
+    </MockedProvider>
+  );
+
+  expect(await findByText('returnInt: 10')).toBeVisible();
+
+  const button = await findByText('INCREMENT');
+  fireEvent.click(button);
+
+  expect(await findByText('returnInt: 11')).toBeVisible();
+})
