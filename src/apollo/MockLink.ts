@@ -1,5 +1,5 @@
 import { ApolloLink, Operation, Observable, FetchResult } from "@apollo/client";
-import { ErgonoMockShape, ergonomock, DefaultMockResolvers } from "../mock";
+import { ErgonoCopyVariableMap, ErgonoMockShape, ergonomock, DefaultMockResolvers } from "../mock";
 import { GraphQLSchema, ExecutionResult, DocumentNode } from "graphql";
 import stringify from "fast-json-stable-stringify";
 
@@ -7,6 +7,7 @@ type MockLinkOptions = {
   addTypename: Boolean;
   onCall?: MockLinkCallHandler;
   resolvers?: DefaultMockResolvers;
+  copyFieldsFromVariables?: ErgonoCopyVariableMap;
 };
 
 export type ApolloErgonoMockMap = Record<
@@ -55,6 +56,7 @@ export default class MockLink extends ApolloLink {
       seed,
       variables: operation.variables,
       resolvers: this.options.resolvers,
+      copyFieldsFromVariables: this.options.copyFieldsFromVariables,
     });
 
     // Return Observer to be compatible with apollo

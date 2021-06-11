@@ -289,26 +289,78 @@ const ComponentWithCacheUpdate = ({ shapeId }: { shapeId: string }): ReactElemen
   );
 }
 
-test.only('Testname: TODO', async () => {
-  const shapeId = '1';
-  const mocks = {
-    OperationA: {
-      queryShape: {
-        returnInt: 10
+describe('copyFieldsFromVariables', () => {
+  test('Automatically copies id from variables', async () => {
+    const shapeId = '111';
+    const copyFieldsFromVariables = {
+      queryShape: { id: 'id' },
+    };
+
+    const { findByText } = render(
+      <MockedProvider schema={schema} copyFieldsFromVariables={copyFieldsFromVariables}>
+        <ComponentWithCacheUpdate shapeId={shapeId} />
+      </MockedProvider>
+    );
+
+    expect(await findByText(`id: ${shapeId}`)).toBeVisible();
+  });
+  test('Object is stored by copied id in cache', async () => {
+    const mocks = {
+      OperationA: {
+        queryShape: { returnInt: 10 },
       }
+    };
+    const copyFieldsFromVariables = {
+      queryShape: { id: 'id' },
+    };
+
+    const { findByText } = render(
+      <MockedProvider schema={schema} mocks={mocks} copyFieldsFromVariables={copyFieldsFromVariables}>
+        <ComponentWithCacheUpdate shapeId="1" />
+      </MockedProvider>
+    );
+
+    expect(await findByText('returnInt: 10')).toBeVisible();
+
+    const button = await findByText('INCREMENT');
+    fireEvent.click(button);
+
+    expect(await findByText('returnInt: 11')).toBeVisible();
+  });
+  test('Copied fields are overridden by mocks', async () => {
+    const mockShapeId = '1';
+    const mocks = {
+      OperationA: {
+        queryShape: { id: mockShapeId },
+      }
+    };
+    const copyFieldsFromVariables = {
+      queryShape: { id: 'id' },
+    };
+
+    const { findByText } = render(
+      <MockedProvider schema={schema} mocks={mocks} copyFieldsFromVariables={copyFieldsFromVariables}>
+        <ComponentWithCacheUpdate shapeId="2"/>
+      </MockedProvider>
+    );
+
+    expect(await findByText(`id: ${mockShapeId}`)).toBeVisible();
+  });
+  test('Copied fields overriddes resolvers', async () => {
+    const shapeId = '2';
+    const resolvers = {
+      Shape: () => ({ id: '1' }),
     }
-  };
+    const copyFieldsFromVariables = {
+      queryShape: { id: 'id' },
+    };
 
-  const { findByText } = render(
-    <MockedProvider schema={schema} mocks={mocks}>
-      <ComponentWithCacheUpdate shapeId={shapeId} />
-    </MockedProvider>
-  );
+    const { findByText } = render(
+      <MockedProvider schema={schema} resolvers={resolvers} copyFieldsFromVariables={copyFieldsFromVariables}>
+        <ComponentWithCacheUpdate shapeId="2"/>
+      </MockedProvider>
+    );
 
-  expect(await findByText('returnInt: 10')).toBeVisible();
-
-  const button = await findByText('INCREMENT');
-  fireEvent.click(button);
-
-  expect(await findByText('returnInt: 11')).toBeVisible();
-})
+    expect(await findByText(`id: ${shapeId}`)).toBeVisible();
+  });
+});

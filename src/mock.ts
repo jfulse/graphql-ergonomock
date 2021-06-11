@@ -39,19 +39,28 @@ export type DefaultMockResolvers = {
   [k: string]: GraphQLFieldResolver<any, any>
 };
 
+export type ErgonoCopyVariableMap = Record<
+  string,
+  Record<string, string>
+>;
+
 export type ErgonomockOptions = {
   mocks?: ErgonoMockShape;
   seed?: string;
   variables?: Record<string, any>;
   resolvers?: DefaultMockResolvers;
+  copyFieldsFromVariables?: ErgonoCopyVariableMap;
 };
+
+const isPlainObject = (potentialObject: any): boolean =>
+  Boolean(potentialObject) && !Array.isArray(potentialObject) && typeof potentialObject === 'object' && Object.keys(potentialObject).length > 0;
 
 export function ergonomock(
   inputSchema: GraphQLSchema | DocumentNode,
   query: string | DocumentNode,
   options: ErgonomockOptions = {}
 ) {
-  const { mocks, seed, variables = {} } = options;
+  const { mocks, seed, variables = {}, copyFieldsFromVariables = {} } = options;
   let schema: GraphQLSchema = inputSchema as GraphQLSchema;
   // Guard rails for schema & query
   if (!isSchema(inputSchema)) {
@@ -99,12 +108,30 @@ export function ergonomock(
       // nullability doesn't matter for the purpose of mocking.
       const fieldType = getNullableType(type) as GraphQLNullableType;
 
-      if (root && fieldName && typeof root[fieldName] !== "undefined") {
-        const mock = root[fieldName];
+      const copiedFieldsForFieldName = copyFieldsFromVariables?.[fieldName ?? ''] ?? {};
+      const currentCopiedFields = Object.entries(copiedFieldsForFieldName).reduce(
+        (acc, [field, variable]) => variable in args ? ({ ...acc, [field]: args[variable] }) : acc,
+        {}
+      );
+
+      const rootContainsFieldName = root && fieldName && typeof root[fieldName] !== "undefined";
+      const haveCopiedFields = Object.keys(currentCopiedFields).length > 0;
+
+      if (rootContainsFieldName || haveCopiedFields) {
+        let result;
+        const mock = fieldName ? (root?.[fieldName] ?? {}) : {};
+
         if (typeof mock === "function") {
-          return mock(root, args, context, info);
+          result = mock(root, args, context, info);
+        } else {
+          result = mock;
         }
-        return root[fieldName];
+
+        if (haveCopiedFields && typeof result === 'object') {
+          return { ...currentCopiedFields, ...result}
+        }
+
+        return result;
       }
 
       // Lists
